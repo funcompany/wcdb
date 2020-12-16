@@ -162,14 +162,23 @@ public final class WCDBCursorInfo: CursorInfoBase {
             return SQLITE_OK
         }
         var optionalLemma: String? = nil
-        string.enumerateLinguisticTags(in: string.startIndex..<string.endIndex,
-                                       scheme: NSLinguisticTagScheme.lemma.rawValue,
-                                       options: NSLinguisticTagger.Options.omitWhitespace,
-                                       orthography: WCDBCursorInfo.orthography,
-                                       invoking: { (tag, _, _, stop) in
-                                        optionalLemma = tag.lowercased()
-                                        stop = true
-        })
+        let searchTermString = string as NSString
+        let range = NSRange(location: 0, length: searchTermString.length)
+        searchTermString.enumerateLinguisticTags(in: range, scheme: NSLinguisticTagScheme(rawValue: NSLinguisticTagScheme.lemma.rawValue), options: NSLinguisticTagger.Options.omitWhitespace, orthography: WCDBCursorInfo.orthography) { (tag, subrange, _, stop) in
+            let resultString: String
+            if let tag = tag {
+                resultString = tag.rawValue
+            } else {
+                /*
+                 If a word stem could not be identified because there is not enough surrounding grammatical context
+                 (such as a single word), keep the original word.
+                 */
+                resultString = searchTermString.substring(with: subrange)
+            }
+            
+            optionalLemma = resultString
+            stop.pointee = true
+        }
         guard let lemma = optionalLemma,
             lemma.count > 0,
             lemma.caseInsensitiveCompare(string) != ComparisonResult.orderedSame else {
